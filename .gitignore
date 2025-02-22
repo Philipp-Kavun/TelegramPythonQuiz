@@ -4,4 +4,5 @@ __pycache__
 db.sqlite3
 *.db
 config.py
-config
+config   
+
