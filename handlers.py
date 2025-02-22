@@ -49,20 +49,20 @@ async def right_answer(callback: types.CallbackQuery):
 
     await callback.message.answer("Верно!")
     current_question_index = await get_quiz_index(callback.from_user.id)
-    correct_score = await get_user_score(callback.from_user.id)
+    current_score = await get_user_score(callback.from_user.id)
     # Обновление номера текущего вопроса в базе данных
     current_question_index += 1  
     # Увеличиваем количество правильных ответов  
-    correct_score += 1
-
-    await update_quiz_index(callback.from_user.id, correct_score)
+    current_score += 1
+    await update_user_score(callback.from_user.id, current_score)
     await update_quiz_index(callback.from_user.id, current_question_index)
 
 
     if current_question_index < len(quiz_data):
         await get_question(callback.message, callback.from_user.id)
     else:
-        await callback.message.answer("Это был последний вопрос. Квиз завершен!")
+        await callback.message.answer(f'''Это был последний вопрос. Квиз завершен!
+                                      \nВаш результат: {current_score} правильных ответов''')
 
 
 @dp.callback_query(F.data == "wrong_answer")
@@ -75,7 +75,7 @@ async def wrong_answer(callback: types.CallbackQuery):
 
     # Получение текущего вопроса из словаря состояний пользователя
     current_question_index = await get_quiz_index(callback.from_user.id)
-    correct_score = await get_user_score(callback.from_user.id)
+    current_score = await get_user_score(callback.from_user.id)
     correct_option = quiz_data[current_question_index]['correct_option']
 
     await callback.message.answer(f"Неправильно. Правильный ответ: {quiz_data[current_question_index]['options'][correct_option]}")
@@ -83,15 +83,16 @@ async def wrong_answer(callback: types.CallbackQuery):
     # Обновление номера текущего вопроса в базе данных
     current_question_index += 1
     await update_quiz_index(callback.from_user.id, current_question_index)
-    await update_user_score(callback.from_user.id, correct_score)
+    await update_user_score(callback.from_user.id, current_score)
     
 
 
     if current_question_index < len(quiz_data):
         await get_question(callback.message, callback.from_user.id)
     else:
-        await callback.message.answer("Это был последний вопрос. Квиз завершен!")
-        
+        await callback.message.answer(f'''Это был последний вопрос. Квиз завершен!
+                                      \nВаш результат: {current_score} правильных ответов''')
+
 async def get_question(message, user_id):
 
     # Получение текущего вопроса из словаря состояний пользователя
@@ -104,7 +105,7 @@ async def get_question(message, user_id):
 # Хендлер на команду /help
 @dp.message(Command('help'))
 async def cmd_start(message: types.Message):
-    await message.answer('''Команды бота: 
-                         \n\start - начать взаимодействие с ботом
-                         \n \help - открыть помощь
-                         \n \quiz -начать игру''')
+    await message.answer('Команды бота:\n\
+                /start - начать взаимодействие с ботом\n\
+                /help - открыть помощь\n\
+                /quiz -начать игру')
