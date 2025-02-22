@@ -3,7 +3,7 @@
 
 from aiogram import F, Dispatcher, types
 from aiogram.filters.command import Command
-from database import get_quiz_index, update_quiz_index
+from database import get_quiz_index, update_quiz_index, update_user_score, get_user_score
 from quiz_data import quiz_data
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from keyboards import generate_options_keyboard
@@ -11,6 +11,32 @@ from keyboards import generate_options_keyboard
 
 # Диспетчер
 dp = Dispatcher()
+
+# Хэндлер на команду /start
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    # Создаем сборщика клавиатур типа Reply
+    builder = ReplyKeyboardBuilder()
+    # Добавляем в сборщик одну кнопку
+    builder.add(types.KeyboardButton(text="Начать игру"))
+    # Прикрепляем кнопки к сообщению
+    await message.answer("Добро пожаловать в квиз!", reply_markup=builder.as_markup(resize_keyboard=True))
+
+# Хэндлер на команду /quiz
+@dp.message(F.text=="Начать игру")
+@dp.message(Command("quiz"))
+async def cmd_quiz(message: types.Message):
+
+    await message.answer(f"Давайте начнем квиз!")
+    await new_quiz(message)
+
+async def new_quiz(message):
+    user_id = message.from_user.id
+    current_question_index = 0
+    new_score = 0
+    await update_quiz_index(user_id, current_question_index)
+    await update_user_score(user_id, new_score)
+    await get_question(message, user_id)
 
 @dp.callback_query(F.data == "right_answer")
 async def right_answer(callback: types.CallbackQuery):
@@ -23,14 +49,13 @@ async def right_answer(callback: types.CallbackQuery):
 
     await callback.message.answer("Верно!")
     current_question_index = await get_quiz_index(callback.from_user.id)
-    
-    # # Увеличиваем количество правильных ответов
-    # correct_answers = await get_quiz_results(callback.from_user.id)
-    # correct_answers += 1
-    # await update_quiz_results(callback.from_user.id, correct_answers)
-    
+    correct_score = await get_user_score(callback.from_user.id)
     # Обновление номера текущего вопроса в базе данных
-    current_question_index += 1
+    current_question_index += 1  
+    # Увеличиваем количество правильных ответов  
+    correct_score += 1
+
+    await update_quiz_index(callback.from_user.id, correct_score)
     await update_quiz_index(callback.from_user.id, current_question_index)
 
 
@@ -50,6 +75,7 @@ async def wrong_answer(callback: types.CallbackQuery):
 
     # Получение текущего вопроса из словаря состояний пользователя
     current_question_index = await get_quiz_index(callback.from_user.id)
+    correct_score = await get_user_score(callback.from_user.id)
     correct_option = quiz_data[current_question_index]['correct_option']
 
     await callback.message.answer(f"Неправильно. Правильный ответ: {quiz_data[current_question_index]['options'][correct_option]}")
@@ -57,21 +83,15 @@ async def wrong_answer(callback: types.CallbackQuery):
     # Обновление номера текущего вопроса в базе данных
     current_question_index += 1
     await update_quiz_index(callback.from_user.id, current_question_index)
+    await update_user_score(callback.from_user.id, correct_score)
+    
 
 
     if current_question_index < len(quiz_data):
         await get_question(callback.message, callback.from_user.id)
     else:
         await callback.message.answer("Это был последний вопрос. Квиз завершен!")
-
-# Хэндлер на команду /quiz
-@dp.message(F.text=="Начать игру")
-@dp.message(Command("quiz"))
-async def cmd_quiz(message: types.Message):
-
-    await message.answer(f"Давайте начнем квиз!")
-    await new_quiz(message)
-
+        
 async def get_question(message, user_id):
 
     # Получение текущего вопроса из словаря состояний пользователя
@@ -81,21 +101,10 @@ async def get_question(message, user_id):
     kb = generate_options_keyboard(opts, opts[correct_index])
     await message.answer(f"{quiz_data[current_question_index]['question']}", reply_markup=kb)
 
-async def new_quiz(message):
-    user_id = message.from_user.id
-    current_question_index = 0
-    results = 0
-    await update_quiz_index(user_id, current_question_index, results)
-    await get_question(message, user_id)
-
-#from database import get_quiz_statistics
-
-# @dp.message(Command(commands=['stats']))
-# async def send_quiz_statistics(message: types.Message):
-#     user_id = message.from_user.id
-#     question_index = await get_quiz_statistics(user_id)
-    
-#     if question_index is not None:
-#         await message.reply(f"Ваш текущий прогресс в квизе: вопрос {question_index}.")
-#     else:
-#         await message.reply("Вы еще не начали квиз.")
+# Хендлер на команду /help
+@dp.message(Command('help'))
+async def cmd_start(message: types.Message):
+    await message.answer('''Команды бота: 
+                         \n\start - начать взаимодействие с ботом
+                         \n \help - открыть помощь
+                         \n \quiz -начать игру''')
